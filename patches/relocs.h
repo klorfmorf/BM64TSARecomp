@@ -9079,14 +9079,13 @@ static const u32 s_relocs_ovl_stage_world8[] = {
 
 #define RELOC_TABLE_SIZE 142
 
-// TODO
 #define RELOC_SECTION_60000000 0x80250000
 #define RELOC_SECTION_40000000 0x80258000
 #define RELOC_SECTION_41000000 0x80280000
-#define RELOC_SECTION_42000000 0x80300000 // (unknown, temporary)
-#define RELOC_SECTION_43000000 0x80340000 // (unknown, temporary)
-#define RELOC_SECTION_44000000 0x80380000 // (unknown, temporary)
-#define RELOC_SECTION_45000000 0x803C0000 // (unknown, temporary)
+#define RELOC_SECTION_42000000 0x8027A000
+#define RELOC_SECTION_43000000 0x802A8000
+#define RELOC_SECTION_44000000 0x802A0000
+#define RELOC_SECTION_45000000 0x80288000
 
 static const RelocInfo g_relocs[RELOC_TABLE_SIZE] = {
     [0x0A] = { s_relocs_ovl_actor_main, 2179, RELOC_SECTION_40000000 },

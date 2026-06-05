@@ -244,14 +244,6 @@ RECOMP_PATCH u32 fexecLoadAddress(s32 id, u32 (*func)()) {
 
     recomp_printf("[fexecLoadAddress] executing decode with args: 0x%08X, 0x%08X, 0x%08X\n", (u32)stream, (u32)func, i);
 
-    /* 0x60000000 */ // 0x80250000
-    /* 0x40000000 */ // 0x80258000
-    /* 0x41000000 */ // 0x80280000
-    /* 0x42000000 */ // 0x80300000 (unknown, temporary)
-    /* 0x43000000 */ // 0x80340000 (unknown, temporary)
-    /* 0x44000000 */ // 0x80380000 (unknown, temporary)
-    /* 0x45000000 */ // 0x803C0000 (unknown, temporary)
-
     funcBackup = func;
     recomp_printf("[fexecLoadAddress] func pre-TLB lookup: 0x%08X\n", (u32)func);
     func = (u32 (*)())( (void *)(tlb_resolve_virtual_to_physical((s32)func) + 0x80000000));
