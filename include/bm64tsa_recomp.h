@@ -96,19 +96,137 @@ typedef uint64_t gpr;
 #define RELOC_SECTION_45000000 0x80288000
 
 // (INTERNAL) inline for TLB lookup
-static inline uint64_t _tlb_lookup(uint64_t val) {  
-    switch((((val) & 0xFF000000) >> 24)) {
-        case 0x60: val = (val - 0x60000000) + RELOC_SECTION_60000000; break;
-        case 0x40: val = (val - 0x40000000) + RELOC_SECTION_40000000; break;
-        case 0x41: val = (val - 0x41000000) + RELOC_SECTION_41000000; break;
-        case 0x42: val = (val - 0x42000000) + RELOC_SECTION_42000000; break;
-        case 0x43: val = (val - 0x43000000) + RELOC_SECTION_43000000; break;
-        case 0x44: val = (val - 0x44000000) + RELOC_SECTION_44000000; break;
-        case 0x45: val = (val - 0x45000000) + RELOC_SECTION_45000000; break;
+
+// To avoid passing both values to the lookup, we check in the macro.
+#define CHECK_ADDR(offset, reg) (((offset & 0xFFFFFFFF00000000) == 0xFFFFFFFF00000000) ? (offset) : (reg))
+
+// use the old mem_w. if we don't, this will loop forever.
+#undef MEM_W
+#define MEM_W(offset, reg) \
+    (*(int32_t*)(rdram + ((((reg) + (offset))) - 0xFFFFFFFF80000000)))
+
+/**
+ * The game uses an array of 64 TLB entries to track the mapped pages.
+ */
+struct UnkStruct800CA668 {
+    /* 0x00 */ long unk0;          // Module identifier?
+    /* 0x04 */ long page_count;    // How many 4KB pages this mapping takes up (for example, 1 means the pages each have a size of 4KB, 4 means they have a size of 16KB, etc.)
+    /* 0x08 */ long virtual_addr;  // Virtual address (KUSEG) of the overlay
+    /* 0x0C */ long physical_addr; // Physical address of the overlay, corresponds to the KSEG0 address with the first bit being zero (for example, physical is 0x00250000 and KSEG0 is 0x80250000)
+}; // size:0x10
+
+extern struct UnkStruct800CA668 D_800CA668[64]; // 0x800CA668
+
+// Defined in patches/required_patches.c. Returns the host-side KSEG0 physical
+// address for a TLB-mapped overlay virtual address, or 0 if the address is not
+// covered by any active overlay slot. The slot allocator gives each overlay
+// its own 256 KB region in rdram so multiple loaded overlays cannot collide
+// the way the game's 8 KB TLB pages do.
+#ifdef __cplusplus
+extern "C" {
+#endif
+uint32_t overlay_slot_resolve(uint32_t virtual_addr);
+#ifdef __cplusplus
+}
+#endif
+
+#define _D_800CA668_RDRAM_OFFSET 0xCA668ULL
+
+/**
+ * Order-agnostic effective address resolver.
+ *
+ * N64Recomp's decompiled output is inconsistent about MEM_*(offset, reg) argument
+ * order: loads (lw/lh/...) tend to emit (base, displacement) while stores (sw/sh/...)
+ * emit (displacement, base). We detect which argument looks like a virtual address
+ * (sign-extended high 32 bits, or a KSEG0 / TLB-mapped pattern) and treat the other
+ * as a signed 16/32-bit displacement.
+ */
+static inline uint64_t _mem_eff_addr(uint64_t a, uint64_t b) {
+    // Treat as an address if the upper 32 bits are sign-extended, OR if the value
+    // looks like a 32-bit KSEG0/TLB address (bit 31 set, or in the TLB-mapped
+    // range 0x10000000+).
+    int a_is_addr = ((a >> 32) == 0xFFFFFFFFULL)
+                 || (((uint32_t)a) >= 0x10000000U);
+    int b_is_addr = ((b >> 32) == 0xFFFFFFFFULL)
+                 || (((uint32_t)b) >= 0x10000000U);
+
+    uint64_t base, disp;
+    if (a_is_addr && !b_is_addr) { base = a; disp = b; }
+    else if (b_is_addr && !a_is_addr) { base = b; disp = a; }
+    else { base = a; disp = b; } // fallback to declared order
+
+    // Sign-extend a zero-extended 32-bit KSEG0/TLB address.
+    if ((base >> 32) == 0 && (base & 0x80000000ULL)) {
+        base |= 0xFFFFFFFF00000000ULL;
+    }
+    return base + (int64_t)(int32_t)disp;
+}
+
+/**
+ * Translate a MIPS virtual address to a sign-extended KSEG0 physical address.
+ *
+ * - Addresses already in normal RDRAM (0x80xxxxxx) or the zerojmp marker (0x10000000)
+ *   are returned as-is (sign-extended).
+ * - Other addresses (TLB-mapped overlay regions like 0x40xxxxxx-0x6Fxxxxxx) are
+ *   resolved through the game's own TLB table at D_800CA668, read directly from
+ *   rdram to avoid recursion via MEM_W.
+ *
+ * The TLB comparison is performed in 32-bit space: a sign-extended 64-bit virtual
+ * address like 0xFFFFFFFF45ABCDEF would otherwise always compare greater than the
+ * 32-bit virtual_addr field.
+ */
+static inline uint64_t _tlb_translate(uint8_t* rdram, uint64_t eff_addr) {
+    // Sign-extend zero-extended 32-bit KSEG0 addresses (callers may pass either form).
+    if ((eff_addr >> 32) == 0 && (eff_addr & 0x80000000ULL)) {
+        eff_addr |= 0xFFFFFFFF00000000ULL;
     }
 
-    return val;
+    uint32_t addr32 = (uint32_t)eff_addr;
+
+    // Fast path: normal RDRAM or zerojmp marker — no TLB walk needed.
+    if ((addr32 >> 24) == 0x80 || addr32 == 0x10000000) {
+        return (uint64_t)(int64_t)(int32_t)addr32;
+    }
+
+    // First, consult our per-overlay slot allocator (patches/required_patches.c).
+    // It covers the case where an overlay is bigger than the game's TLB page
+    // window and so wouldn't be findable in D_800CA668.
+    {
+        uint32_t slot_phys = overlay_slot_resolve(addr32);
+        if (slot_phys != 0) {
+            return (uint64_t)(int64_t)(int32_t)slot_phys;
+        }
+    }
+
+    // Fall back to walking the game's TLB table directly via rdram (no
+    // recursion through MEM_W). This handles addresses the game has mapped
+    // but that we haven't tracked as an overlay slot (e.g. zerojmp pages).
+    uint8_t* tlb_base = rdram + _D_800CA668_RDRAM_OFFSET;
+    for (int page = 0; page < 64; page++) {
+        uint8_t* entry = tlb_base + (page * 0x10);
+        uint32_t virtual_addr  = *(uint32_t*)(entry + 0x8);
+        uint32_t physical_addr = *(uint32_t*)(entry + 0xC);
+
+        // Page covers a 0x8000-byte (32 KiB) range starting at virtual_addr.
+        if (addr32 >= virtual_addr && (virtual_addr + 0x8000U) > addr32) {
+            uint32_t phys = (addr32 - virtual_addr) + physical_addr + 0x80000000U;
+            return (uint64_t)(int64_t)(int32_t)phys;
+        }
+    }
+
+    // No mapping found — return the original (sign-extended). Will most likely
+    // segfault downstream, which matches the previous "let N64Recomp crash" behavior.
+    return (uint64_t)(int64_t)(int32_t)addr32;
 }
+
+/**
+ * Order-agnostic TLB lookup used by the MEM_* macros and LOOKUP_FUNC.
+ * Returns the sign-extended KSEG0 physical address of the effective virtual address.
+ */
+static inline uint64_t _tlb_lookup(uint8_t* rdram, uint64_t a, uint64_t b) {
+    return _tlb_translate(rdram, _mem_eff_addr(a, b));
+}
+#undef MEM_W
 
 #define SIGNED(val) \
     ((int64_t)(val))
@@ -119,27 +237,32 @@ static inline uint64_t _tlb_lookup(uint64_t val) {
 #define SUB32(a, b) \
     ((gpr)(int32_t)((a) - (b)))
 
+// MEM_* macros: _tlb_lookup now returns the fully-resolved sign-extended KSEG0
+// physical address (effective address with TLB translation already applied and
+// the offset already folded in), so we no longer add `+ (offset)` after the call.
+
 #define MEM_W(offset, reg) \
-    (*(int32_t*)(rdram + ((((_tlb_lookup(reg)) + (offset))) - 0xFFFFFFFF80000000)))
+    (*(int32_t*)(rdram + (_tlb_lookup(rdram, (uint64_t)(offset), (uint64_t)(reg)) - 0xFFFFFFFF80000000)))
 
 #define MEM_H(offset, reg) \
-    (*(int16_t*)(rdram + ((((_tlb_lookup(reg)) + (offset)) ^ 2) - 0xFFFFFFFF80000000)))
+    (*(int16_t*)(rdram + ((_tlb_lookup(rdram, (uint64_t)(offset), (uint64_t)(reg)) ^ 2) - 0xFFFFFFFF80000000)))
 
 #define MEM_B(offset, reg) \
-    (*(int8_t*)(rdram + ((((_tlb_lookup(reg)) + (offset)) ^ 3) - 0xFFFFFFFF80000000)))
+    (*(int8_t*)(rdram + ((_tlb_lookup(rdram, (uint64_t)(offset), (uint64_t)(reg)) ^ 3) - 0xFFFFFFFF80000000)))
 
 #define MEM_WU(offset, reg) \
-    (*(uint32_t*)(rdram + ((((_tlb_lookup(reg)) + (offset))) - 0xFFFFFFFF80000000)))
+    (*(uint32_t*)(rdram + (_tlb_lookup(rdram, (uint64_t)(offset), (uint64_t)(reg)) - 0xFFFFFFFF80000000)))
 
 #define MEM_HU(offset, reg) \
-    (*(uint16_t*)(rdram + ((((_tlb_lookup(reg)) + (offset)) ^ 2) - 0xFFFFFFFF80000000)))
+    (*(uint16_t*)(rdram + ((_tlb_lookup(rdram, (uint64_t)(offset), (uint64_t)(reg)) ^ 2) - 0xFFFFFFFF80000000)))
 
 #define MEM_BU(offset, reg) \
-    (*(uint8_t*)(rdram + ((((_tlb_lookup(reg)) + (offset)) ^ 3) - 0xFFFFFFFF80000000)))
+    (*(uint8_t*)(rdram + ((_tlb_lookup(rdram, (uint64_t)(offset), (uint64_t)(reg)) ^ 3) - 0xFFFFFFFF80000000)))
 
 #define SD(val, offset, reg) { \
-    *(uint32_t*)(rdram + ((((_tlb_lookup(reg)) + (offset) + 4)) - 0xFFFFFFFF80000000)) = (uint32_t)((gpr)(val) >> 0); \
-    *(uint32_t*)(rdram + ((((_tlb_lookup(reg)) + (offset) + 0)) - 0xFFFFFFFF80000000)) = (uint32_t)((gpr)(val) >> 32); \
+    uint64_t _sd_phys = _tlb_lookup(rdram, (uint64_t)(offset), (uint64_t)(reg)); \
+    *(uint32_t*)(rdram + ((_sd_phys + 4) - 0xFFFFFFFF80000000)) = (uint32_t)((gpr)(val) >> 0); \
+    *(uint32_t*)(rdram + ((_sd_phys + 0) - 0xFFFFFFFF80000000)) = (uint32_t)((gpr)(val) >> 32); \
 }
 
 static inline uint64_t load_doubleword(uint8_t* rdram, gpr reg, gpr offset) {
@@ -477,9 +600,9 @@ typedef void (recomp_func_ext_t)(uint8_t* rdram, recomp_context* ctx, uintptr_t 
 
 recomp_func_t* get_function(int32_t vram);
 
-// Translate the TLB values.
+// Translate the TLB values. Pass a 0 for offset
 #define LOOKUP_FUNC(val)         \
-    get_function((int32_t)(_tlb_lookup(val)))
+    get_function((int32_t)(_tlb_lookup(rdram, 0, val)))
 
 extern int32_t* section_addresses;
 

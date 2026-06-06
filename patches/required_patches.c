@@ -33,7 +33,7 @@ RECOMP_PATCH void dmaRead(void* vAddr, s32 size, u32 devAddr) {
         } while (D_80097D48 != 0);
     }
 
-    recomp_printf("[dmaRead] vaddr 0x%08X size 0x%08X devAddr 0x%08X\n", (u32)vAddr, size, devAddr);
+    //recomp_printf("[dmaRead] vaddr 0x%08X size 0x%08X devAddr 0x%08X\n", (u32)vAddr, size, devAddr);
 
     D_80097D48 = 1;
     osWritebackDCache(vAddr, size);
@@ -189,6 +189,18 @@ s32 tlb_resolve_virtual_to_physical(s32 virtual_addr) {
     return -1;
 }
 
+// Implemented natively in src/game/recomp_api.cpp. Allocates (or reuses) a
+// dedicated 256 KB slot in rdram for the overlay identified by virtual_addr,
+// and returns the host-side KSEG0 physical address of that slot.
+//
+// This works around the fact that the game's TLB allocator (modulegetfreepages)
+// only hands out 8 KB pages and lays overlays only 32 KB apart, which is not
+// enough room for several real overlays (e.g. ovl_coll_main is ~40 KB once
+// .data/.bss are counted). With the original layout, loading one overlay
+// silently corrupted the data section of the previously loaded overlay
+// occupying the next slot in the TLB region.
+extern u32 recomp_overlay_slot_allocate(u32 virtual_addr, s32 file_id);
+
 RECOMP_PATCH u32 fexecLoadAddress(s32 id, u32 (*func)()) {
     HuFILE *stream;
     s32 i;
@@ -246,7 +258,7 @@ RECOMP_PATCH u32 fexecLoadAddress(s32 id, u32 (*func)()) {
 
     funcBackup = func;
     recomp_printf("[fexecLoadAddress] func pre-TLB lookup: 0x%08X\n", (u32)func);
-    func = (u32 (*)())( (void *)(tlb_resolve_virtual_to_physical((s32)func) + 0x80000000));
+    func = (u32 (*)())(u32)recomp_overlay_slot_allocate((u32)funcBackup, fileID);
     recomp_printf("[fexecLoadAddress] func after-TLB lookup: 0x%08X\n", (u32)func);
 
     // TODO: Rest of overlays
