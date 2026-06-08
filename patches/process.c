@@ -388,6 +388,7 @@ RECOMP_PATCH void CallProcess(s32 time) {
                 }
                 else {
                     cur_proc_local->exec_mode = EXEC_PROCESS_DEFAULT;
+                    free(current_process->heap);
                     goto run_process;
                 }
                 break;
@@ -540,12 +541,13 @@ RECOMP_PATCH void CheckProcessStruct(void) {
     }
 }
 
+// So stupid.
 RECOMP_PATCH void CheckProcessStackBroken(void) {
-    yield_to_scheduler(YIELD_STACKCHECK);
+    //yield_to_scheduler(YIELD_STACKCHECK);
 }
 
 RECOMP_PATCH s32 CheckProcessStack(void) {
-    yield_to_scheduler(YIELD_STACKCHECK);
+    //yield_to_scheduler(YIELD_STACKCHECK);
 
     if ((getsp() - (s32)current_process->base_sp) < 5) {
         return 1;

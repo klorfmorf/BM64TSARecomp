@@ -58,3 +58,4 @@ recomp_process_set_started = 0x8F000100;
 osCreatePiManager_recomp = 0x8F000108;
 osYieldThread_recomp = 0x8F00010C;
 recomp_overlay_slot_allocate = 0x8F000110;
+yield_self_1ms = 0x8F000114;

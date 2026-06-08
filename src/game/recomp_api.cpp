@@ -172,7 +172,7 @@ struct OverlaySlot {
 
 constexpr uint32_t kOverlaySlotBase  = 0x80900000U; // above patches.ld RAMBASE (0x80801000)+patch code (~50KB), below recomp heap (0x81000000)
 constexpr uint32_t kOverlaySlotSize  = 0x00040000U; // 256 KB
-constexpr int      kOverlaySlotCount = 27;          // 27 * 256 KB = ~6.75 MB, ends at 0x80FC0000 (256 KB buffer below recomp heap at 0x81000000)
+constexpr int      kOverlaySlotCount = 39;          // 39 * 256 KB = ~6.75 MB, ends at 0x80FC0000 (256 KB buffer below recomp heap at 0x81000000)
 
 std::array<OverlaySlot, kOverlaySlotCount> g_overlay_slots{};
 std::mutex g_overlay_slots_mtx;

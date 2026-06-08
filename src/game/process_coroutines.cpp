@@ -334,7 +334,7 @@ extern "C" void recomp_process_yield(uint8_t* rdram, recomp_context* ctx) {
     // Resumed by scheduler
     slot->state = ProcessState::Running;
 
-    process_log("Process %u resumed with value %d", slot->process_id, g_resume_value);
+    process_log("Process %u resumed with value %d (entry func: 0x%08X)", slot->process_id, g_resume_value, slot->entry_func);
 
     _return(ctx, g_resume_value);
 }
