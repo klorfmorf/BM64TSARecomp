@@ -95,15 +95,10 @@ typedef uint64_t gpr;
 #define RELOC_SECTION_44000000 0x802A0000
 #define RELOC_SECTION_45000000 0x80288000
 
-// (INTERNAL) inline for TLB lookup
-
-// To avoid passing both values to the lookup, we check in the macro.
-#define CHECK_ADDR(offset, reg) (((offset & 0xFFFFFFFF00000000) == 0xFFFFFFFF00000000) ? (offset) : (reg))
-
-// use the old mem_w. if we don't, this will loop forever.
-#undef MEM_W
-#define MEM_W(offset, reg) \
-    (*(int32_t*)(rdram + ((((reg) + (offset))) - 0xFFFFFFFF80000000)))
+// ----------------------------------------------------------------------------------
+// SLOP QUARANTINE ZONE
+// You deserve what happens to you if you touch anything in this zone and it breaks.
+// ----------------------------------------------------------------------------------
 
 /**
  * The game uses an array of 64 TLB entries to track the mapped pages.
@@ -134,34 +129,6 @@ uint32_t overlay_slot_resolve(uint32_t virtual_addr);
 #define _D_800CA668_RDRAM_OFFSET 0xCA668ULL
 
 /**
- * Order-agnostic effective address resolver.
- *
- * N64Recomp's decompiled output is inconsistent about MEM_*(offset, reg) argument
- * order: loads (lw/lh/...) tend to emit (base, displacement) while stores (sw/sh/...)
- * emit (displacement, base). We detect which argument looks like a virtual address
- * (sign-extended high 32 bits, or a KSEG0 / TLB-mapped pattern) and treat the other
- * as a signed 16/32-bit displacement.
- */
-static inline int64_t _mem_eff_addr(int64_t a, int64_t b) {
-    uint64_t base, disp;
-
-    // The base is the one with the *much larger* absolute value
-    if (llabs(a) > llabs(b)) {
-        base = a;
-        disp = b;
-    } else {
-        base = b;
-        disp = a;
-    }
-
-    // Sign-extend a zero-extended 32-bit KSEG0/TLB address.
-    if ((base >> 32) == 0 && (base & 0x80000000ULL)) {
-        base |= 0xFFFFFFFF00000000ULL;
-    }
-    return base + (int64_t)(int32_t)disp;
-}
-
-/**
  * Translate a MIPS virtual address to a sign-extended KSEG0 physical address.
  *
  * - Addresses already in normal RDRAM (0x80xxxxxx) or the zerojmp marker (0x10000000)
@@ -174,7 +141,7 @@ static inline int64_t _mem_eff_addr(int64_t a, int64_t b) {
  * address like 0xFFFFFFFF45ABCDEF would otherwise always compare greater than the
  * 32-bit virtual_addr field.
  */
-static inline int64_t _tlb_translate(uint8_t* rdram, int64_t eff_addr) {
+static inline int64_t _tlb_lookup(uint8_t* rdram, int64_t eff_addr) {
     uint32_t addr32 = (uint32_t)eff_addr;
 
     // Fast path: normal RDRAM or zerojmp marker — no TLB walk needed.
@@ -212,14 +179,9 @@ static inline int64_t _tlb_translate(uint8_t* rdram, int64_t eff_addr) {
     return (int64_t)(int64_t)(int32_t)addr32; // same here.
 }
 
-/**
- * Order-agnostic TLB lookup used by the MEM_* macros and LOOKUP_FUNC.
- * Returns the sign-extended KSEG0 physical address of the effective virtual address.
- */
-static inline int64_t _tlb_lookup(uint8_t* rdram, int64_t a, int64_t b) {
-    return _tlb_translate(rdram, _mem_eff_addr(a, b));
-}
-#undef MEM_W
+// ----------------------------------------------------------------------------------
+// SLOP QUARANTINE ZONE END
+// ----------------------------------------------------------------------------------
 
 #define SIGNED(val) \
     ((int64_t)(val))
@@ -235,25 +197,25 @@ static inline int64_t _tlb_lookup(uint8_t* rdram, int64_t a, int64_t b) {
 // the offset already folded in), so we no longer add `+ (offset)` after the call.
 
 #define MEM_W(offset, reg) \
-    (*(int32_t*)(rdram + (_tlb_lookup(rdram, offset, reg) - 0xFFFFFFFF80000000)))
+    (*(int32_t*)(rdram + (_tlb_lookup(rdram, offset + reg) - 0xFFFFFFFF80000000)))
 
 #define MEM_H(offset, reg) \
-    (*(int16_t*)(rdram + ((_tlb_lookup(rdram, offset, reg) ^ 2) - 0xFFFFFFFF80000000)))
+    (*(int16_t*)(rdram + ((_tlb_lookup(rdram, offset + reg) ^ 2) - 0xFFFFFFFF80000000)))
 
 #define MEM_B(offset, reg) \
-    (*(int8_t*)(rdram + ((_tlb_lookup(rdram, offset, reg) ^ 3) - 0xFFFFFFFF80000000)))
+    (*(int8_t*)(rdram + ((_tlb_lookup(rdram, offset + reg) ^ 3) - 0xFFFFFFFF80000000)))
 
 #define MEM_WU(offset, reg) \
-    (*(uint32_t*)(rdram + (_tlb_lookup(rdram, offset, reg) - 0xFFFFFFFF80000000)))
+    (*(uint32_t*)(rdram + (_tlb_lookup(rdram, offset + reg) - 0xFFFFFFFF80000000)))
 
 #define MEM_HU(offset, reg) \
-    (*(uint16_t*)(rdram + ((_tlb_lookup(rdram, offset, reg) ^ 2) - 0xFFFFFFFF80000000)))
+    (*(uint16_t*)(rdram + ((_tlb_lookup(rdram, offset + reg) ^ 2) - 0xFFFFFFFF80000000)))
 
 #define MEM_BU(offset, reg) \
-    (*(uint8_t*)(rdram + ((_tlb_lookup(rdram, offset, reg) ^ 3) - 0xFFFFFFFF80000000)))
+    (*(uint8_t*)(rdram + ((_tlb_lookup(rdram, offset + reg) ^ 3) - 0xFFFFFFFF80000000)))
 
 #define SD(val, offset, reg) { \
-    uint64_t _sd_phys = _tlb_lookup(rdram, offset, reg); \
+    uint64_t _sd_phys = _tlb_lookup(rdram, offset + reg); \
     *(uint32_t*)(rdram + ((_sd_phys + 4) - 0xFFFFFFFF80000000)) = (uint32_t)((gpr)(val) >> 0); \
     *(uint32_t*)(rdram + ((_sd_phys + 0) - 0xFFFFFFFF80000000)) = (uint32_t)((gpr)(val) >> 32); \
 }
@@ -595,7 +557,7 @@ recomp_func_t* get_function(int32_t vram);
 
 // Translate the TLB values. Pass a 0 for offset
 #define LOOKUP_FUNC(val)         \
-    get_function((int32_t)(_tlb_lookup(rdram, 0, val)))
+    get_function((int32_t)(_tlb_lookup(rdram, 0 + val)))
 
 extern int32_t* section_addresses;
 

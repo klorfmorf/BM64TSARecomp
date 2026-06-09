@@ -91,3 +91,17 @@ text = """
     ctx->r20 = 320; // s4
     ctx->r21 = 240; // s5
 """
+
+[[patches.hook]]
+func = "func_80008738"
+before_vram = 0x8000885C
+text = """
+    ctx->r24 = 0x005003C0; // force scissor write to store 320, 240 coords. Due to the float rounding, this gets discarded
+"""
+
+[[patches.hook]]
+func = "func_800082AC"
+before_vram = 0x80008494
+text = """
+    ctx->r13 = 0x005003C0; // force scissor write to store 320, 240 coords. Due to the float rounding, this gets discarded
+"""
