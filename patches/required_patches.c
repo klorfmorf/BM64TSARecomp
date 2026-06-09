@@ -473,3 +473,23 @@ RECOMP_PATCH void decode(HuFILE *arg0, u8* arg1, s32 arg2) {
 }
 
 #endif
+
+struct UnkStruct80008F90 {
+    char filler0[0x4];
+    u32 unk4;
+    u32 unk8;
+    u32 unkC;
+    u32 unk10;
+};
+
+// Sets screen coordinates
+RECOMP_PATCH void func_80008F90(struct UnkStruct80008F90* arg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4) {
+    arg1 = 0;
+    arg2 = 0;
+    arg3 = 320;
+    arg4 = 240;
+    arg0->unk4 = arg1;
+    arg0->unk8 = arg2;
+    arg0->unkC = arg3;
+    arg0->unk10 = arg4;
+}

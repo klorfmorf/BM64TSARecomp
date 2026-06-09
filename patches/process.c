@@ -363,14 +363,6 @@ RECOMP_PATCH void CallProcess(s32 time) {
             break;
         }
 
-        // Check stat flag
-        if (cur_proc_local->stat & 1) {
-            if (cur_proc_local->exec_mode != 3) {
-                current_process = current_process->next;
-                continue;
-            }
-        }
-
         switch (cur_proc_local->exec_mode) {
             case EXEC_PROCESS_UNK4: // paused
                 current_process = current_process->next;

@@ -79,3 +79,15 @@ value = 0x3C010000 # lui        $at, (0x20000000 >> 16) -> lui        $at, (0x00
 func = "func_80026578"
 vram = 0x80026790
 value = 0x00E3082A # sltu $at, $a3, $v1 -> slt $at, $a3, $v1
+
+# Force the widescreen values.
+[[patches.hook]]
+func = "func_80008738"
+before_vram = 0x80008768
+text = """
+// Patch to force widescreen.
+    ctx->r18 = 0; // s2
+    ctx->r19 = 0; // s3
+    ctx->r20 = 320; // s4
+    ctx->r21 = 240; // s5
+"""
