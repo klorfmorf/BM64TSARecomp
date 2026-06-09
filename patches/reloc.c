@@ -22,7 +22,7 @@ static u32 reloc_virtual_base_for(u32 original_vaddr) {
 }
 
 void overlay_apply_relocations(u32 file_id, u8 *load_addr) {
-    //recomp_printf("[overlay_apply_relocations] file_id 0x%08X load_addr 0x%08X\n", file_id, load_addr);
+    recomp_printf("[overlay_apply_relocations] file_id 0x%08X load_addr 0x%08X\n", file_id, load_addr);
 
     if (file_id >= RELOC_TABLE_SIZE) {
         return;
@@ -46,6 +46,6 @@ void overlay_apply_relocations(u32 file_id, u8 *load_addr) {
 
         *value_addr = value + (u32)delta;
 
-        //recomp_printf("[overlay_apply_relocations] 0x%08X -> 0x%08X\n", value, *value_addr);
+        recomp_printf("[overlay_apply_relocations] 0x%08X -> 0x%08X\n", value, *value_addr);
     }
 }

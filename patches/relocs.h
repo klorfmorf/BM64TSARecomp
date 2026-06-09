@@ -2395,7 +2395,7 @@ static const u32 s_relocs_ovl_coll_main[] = {
     0x00006CD8,
 };
 
-/* .ovl_mobj_main: VMA 0x45000000, 1595 relocations */
+/* .ovl_mobj_main: VMA 0x45000000, 1592 relocations */
 static const u32 s_relocs_ovl_mobj_main[] = {
     0x0000F940,
     0x0000F944,
@@ -2475,9 +2475,6 @@ static const u32 s_relocs_ovl_mobj_main[] = {
     0x0000FCD8,
     0x0000FCE0,
     0x0000FFE8,
-    0x00010430,
-    0x00010434,
-    0x00010438,
     0x0001047C,
     0x00010480,
     0x00010484,
@@ -8528,20 +8525,8 @@ static const u32 s_relocs_ovl_menu_stage[] = {
     0x00006920,
 };
 
-/* .ovl_demo_story: VMA 0x60000000, 59 relocations */
+/* .ovl_demo_story: VMA 0x60000000, 41 relocations */
 static const u32 s_relocs_ovl_demo_story[] = {
-    0x00006B70,
-    0x00006CC0,
-    0x00006EB8,
-    0x00006F5C,
-    0x00006F60,
-    0x00007154,
-    0x000071A8,
-    0x000071FC,
-    0x00007250,
-    0x00007254,
-    0x000072A4,
-    0x000072A8,
     0x000072D4,
     0x000072DC,
     0x000072E4,
@@ -8573,12 +8558,6 @@ static const u32 s_relocs_ovl_demo_story[] = {
     0x000076C4,
     0x000076D8,
     0x000076EC,
-    0x00007728,
-    0x0000772C,
-    0x000077D0,
-    0x000077D4,
-    0x00007878,
-    0x0000787C,
     0x00007930,
     0x00007934,
     0x00007938,
