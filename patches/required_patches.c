@@ -33,7 +33,7 @@ RECOMP_PATCH void dmaRead(void* vAddr, s32 size, u32 devAddr) {
         } while (D_80097D48 != 0);
     }
 
-    recomp_printf("[dmaRead] vaddr 0x%08X size 0x%08X devAddr 0x%08X\n", (u32)vAddr, size, devAddr);
+    //recomp_printf("[dmaRead] vaddr 0x%08X size 0x%08X devAddr 0x%08X\n", (u32)vAddr, size, devAddr);
 
     D_80097D48 = 1;
     osWritebackDCache(vAddr, size);

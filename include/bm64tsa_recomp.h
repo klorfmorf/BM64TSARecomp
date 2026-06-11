@@ -8,6 +8,8 @@
 #include <assert.h>
 #include <stdio.h>
 
+#include "tlb.h"
+
 // Compiler definition to disable inter-procedural optimization, allowing multiple functions to be in a single file without breaking interposition.
 #if defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
     // MSVC's __declspec(noinline) seems to disable inter-procedural optimization entirely, so it's all that's needed.
@@ -95,6 +97,60 @@ typedef uint64_t gpr;
 #define RELOC_SECTION_44000000 0x802A0000
 #define RELOC_SECTION_45000000 0x80288000
 
+static inline int64_t _tlb_lookup(uint8_t* rdram, int64_t eff_addr) {
+    uint32_t addr32 = (uint32_t)eff_addr;
+
+    // Fast path: normal RDRAM or zerojmp marker — no TLB walk needed.
+    if ((addr32 >> 24) == 0x80 || addr32 == 0x10000000) {
+        return (int64_t)(int64_t)(int32_t)addr32; // we repeatedly cast in order to readd the upper FFFFFFFF value(s).
+    }
+
+    // Fall back to walking the game's TLB table directly via rdram (no
+    // recursion through MEM_W). This handles addresses the game has mapped
+    // but that we haven't tracked as an overlay slot (e.g. zerojmp pages).
+    for(int i = 0; i < TLB_ENTRY_COUNT; i++) {
+        uint32_t pagesize = gTLBTable[i].pagesize;
+        uint32_t fullsize = pagesize;
+        int tlb_count = 0; // we need to keep track of the number of uses of addr field because effective page size matters
+
+        if (gTLBTable[i].evenpaddr != -1) tlb_count++;
+        if (gTLBTable[i].oddpaddr != -1) tlb_count++;
+
+        if (tlb_count == 0) {
+            continue; // skip empty entries.
+        }
+
+        // if both fields are used, the effective range is double due to 2 pages.
+        if (tlb_count == 2) {
+            fullsize += pagesize;
+        }
+
+        // is the address in the range?
+        if (addr32 >= gTLBTable[i].vaddr && addr32 <= (gTLBTable[i].vaddr + fullsize)) {
+            uint32_t offset = addr32 - gTLBTable[i].vaddr; // fetch the offset.
+            int in_latter_mem = 0;
+            uint32_t new_addr = 0;
+
+            // if our offset is bigger than the pagesize, we need to use the later address.
+            if (offset > pagesize) {
+                in_latter_mem = 1;
+                offset -= pagesize; // get the true offset. we need the bigger address.
+                new_addr = (gTLBTable[i].oddpaddr > gTLBTable[i].evenpaddr) ? gTLBTable[i].oddpaddr : gTLBTable[i].evenpaddr;
+            } else {
+                // we need the lower address.
+                new_addr = (gTLBTable[i].oddpaddr < gTLBTable[i].evenpaddr) ? gTLBTable[i].oddpaddr : gTLBTable[i].evenpaddr;
+            }
+
+            new_addr += offset;
+            new_addr += 0x80000000;
+
+            return (int64_t)(int64_t)(int32_t)new_addr; // same here.
+        }
+    }
+    printf("[_tlb_lookup] WARNING: Lookup failed. Defaulting to original address 0x%jX. Recomp may crash!\n", eff_addr);
+    return (int64_t)(int64_t)(int32_t)eff_addr; // same here.
+}
+
 // ----------------------------------------------------------------------------------
 // SLOP QUARANTINE ZONE
 // You deserve what happens to you if you touch anything in this zone and it breaks.
@@ -141,20 +197,12 @@ uint32_t overlay_slot_resolve(uint32_t virtual_addr);
  * address like 0xFFFFFFFF45ABCDEF would otherwise always compare greater than the
  * 32-bit virtual_addr field.
  */
-static inline int64_t _tlb_lookup(uint8_t* rdram, int64_t eff_addr) {
+static inline int64_t _tlb_lookup_old(uint8_t* rdram, int64_t eff_addr) {
     uint32_t addr32 = (uint32_t)eff_addr;
 
     // Fast path: normal RDRAM or zerojmp marker — no TLB walk needed.
     if ((addr32 >> 24) == 0x80 || addr32 == 0x10000000) {
         return (int64_t)(int64_t)(int32_t)addr32; // we repeatedly cast in order to readd the upper FFFFFFFF value(s).
-    }
-
-    // First, consult our per-overlay slot allocator (src/game/recomp_api.cpp).
-    // It covers the case where an overlay is bigger than the game's TLB page
-    // window and so wouldn't be findable in D_800CA668.
-    uint32_t slot_phys = overlay_slot_resolve(addr32);
-    if (slot_phys != 0) {
-        return (int64_t)(int64_t)(int32_t)slot_phys; // same here.
     }
 
     // Fall back to walking the game's TLB table directly via rdram (no
