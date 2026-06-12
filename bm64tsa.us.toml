@@ -105,3 +105,35 @@ before_vram = 0x80008494
 text = """
     ctx->r13 = 0x005003C0; // force scissor write to store 320, 240 coords. Due to the float rounding, this gets discarded
 """
+
+# Patch the game over fade square coordinates so it's properly stretched by RT64.
+[[patches.instruction]]
+func = "func_80031260"
+vram = 0x8003134C
+value = 0x240E0140 # addiu      $t6, $zero, 0x130 -> addiu      $t6, $zero, 0x140
+
+[[patches.instruction]]
+func = "func_80031260"
+vram = 0x80031350
+value = 0x240F00F0 # addiu      $t7, $zero, 0xE0 -> addiu      $t7, $zero, 0xF0
+
+# We also need to override the actual DL write because of the float rounding done on these values.
+[[patches.hook]]
+func = "func_80030BB4"
+before_vram = 0x80030D08
+text = """
+    // only patch if the game over fade
+    if (ctx->r15 == 0xF64DC39C) {
+        ctx->r15 = 0xF65003C0;
+    }
+"""
+
+[[patches.hook]]
+func = "func_80030BB4"
+before_vram = 0x80030D68
+text = """
+    // only patch if the game over fade
+    if (ctx->r15 == 0x00020020) {
+        ctx->r15 = 0x00000000;
+    }
+"""
