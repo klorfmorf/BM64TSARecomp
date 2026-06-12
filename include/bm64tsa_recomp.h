@@ -89,67 +89,13 @@ typedef uint64_t gpr;
 /**
  * TLB Lookup addresses for Bomberman 64: The Second Attack
  */
-#define RELOC_SECTION_60000000 0x80250000
-#define RELOC_SECTION_40000000 0x80258000
-#define RELOC_SECTION_41000000 0x80280000
-#define RELOC_SECTION_42000000 0x8027A000
-#define RELOC_SECTION_43000000 0x802A8000
-#define RELOC_SECTION_44000000 0x802A0000
-#define RELOC_SECTION_45000000 0x80288000
-
-static inline int64_t _tlb_lookup(uint8_t* rdram, int64_t eff_addr) {
-    uint32_t addr32 = (uint32_t)eff_addr;
-
-    // Fast path: normal RDRAM or zerojmp marker — no TLB walk needed.
-    if ((addr32 >> 24) == 0x80 || addr32 == 0x10000000) {
-        return (int64_t)(int64_t)(int32_t)addr32; // we repeatedly cast in order to readd the upper FFFFFFFF value(s).
-    }
-
-    // Fall back to walking the game's TLB table directly via rdram (no
-    // recursion through MEM_W). This handles addresses the game has mapped
-    // but that we haven't tracked as an overlay slot (e.g. zerojmp pages).
-    for(int i = 0; i < TLB_ENTRY_COUNT; i++) {
-        uint32_t pagesize = gTLBTable[i].pagesize;
-        uint32_t fullsize = pagesize;
-        int tlb_count = 0; // we need to keep track of the number of uses of addr field because effective page size matters
-
-        if (gTLBTable[i].evenpaddr != -1) tlb_count++;
-        if (gTLBTable[i].oddpaddr != -1) tlb_count++;
-
-        if (tlb_count == 0) {
-            continue; // skip empty entries.
-        }
-
-        // if both fields are used, the effective range is double due to 2 pages.
-        if (tlb_count == 2) {
-            fullsize += pagesize;
-        }
-
-        // is the address in the range?
-        if (addr32 >= gTLBTable[i].vaddr && addr32 <= (gTLBTable[i].vaddr + fullsize)) {
-            uint32_t offset = addr32 - gTLBTable[i].vaddr; // fetch the offset.
-            int in_latter_mem = 0;
-            uint32_t new_addr = 0;
-
-            // if our offset is bigger than the pagesize, we need to use the later address.
-            if (offset > pagesize) {
-                in_latter_mem = 1;
-                offset -= pagesize; // get the true offset. we need the bigger address.
-                new_addr = (gTLBTable[i].oddpaddr > gTLBTable[i].evenpaddr) ? gTLBTable[i].oddpaddr : gTLBTable[i].evenpaddr;
-            } else {
-                // we need the lower address.
-                new_addr = (gTLBTable[i].oddpaddr < gTLBTable[i].evenpaddr) ? gTLBTable[i].oddpaddr : gTLBTable[i].evenpaddr;
-            }
-
-            new_addr += offset;
-            new_addr += 0x80000000;
-
-            return (int64_t)(int64_t)(int32_t)new_addr; // same here.
-        }
-    }
-    printf("[_tlb_lookup] WARNING: Lookup failed. Defaulting to original address 0x%jX. Recomp may crash!\n", eff_addr);
-    return (int64_t)(int64_t)(int32_t)eff_addr; // same here.
-}
+#define RELOC_SECTION_60000000 0x60000000
+#define RELOC_SECTION_40000000 0x40000000
+#define RELOC_SECTION_41000000 0x41000000
+#define RELOC_SECTION_42000000 0x42000000
+#define RELOC_SECTION_43000000 0x43000000
+#define RELOC_SECTION_44000000 0x44000000
+#define RELOC_SECTION_45000000 0x45000000
 
 #define SIGNED(val) \
     ((int64_t)(val))
@@ -165,25 +111,25 @@ static inline int64_t _tlb_lookup(uint8_t* rdram, int64_t eff_addr) {
 // the offset already folded in), so we no longer add `+ (offset)` after the call.
 
 #define MEM_W(offset, reg) \
-    (*(int32_t*)(rdram + (_tlb_lookup(rdram, offset + reg) - 0xFFFFFFFF80000000)))
+    (*(int32_t*)(rdram + (_tlb_lookup(offset + reg) - 0xFFFFFFFF80000000)))
 
 #define MEM_H(offset, reg) \
-    (*(int16_t*)(rdram + ((_tlb_lookup(rdram, offset + reg) ^ 2) - 0xFFFFFFFF80000000)))
+    (*(int16_t*)(rdram + ((_tlb_lookup(offset + reg) ^ 2) - 0xFFFFFFFF80000000)))
 
 #define MEM_B(offset, reg) \
-    (*(int8_t*)(rdram + ((_tlb_lookup(rdram, offset + reg) ^ 3) - 0xFFFFFFFF80000000)))
+    (*(int8_t*)(rdram + ((_tlb_lookup(offset + reg) ^ 3) - 0xFFFFFFFF80000000)))
 
 #define MEM_WU(offset, reg) \
-    (*(uint32_t*)(rdram + (_tlb_lookup(rdram, offset + reg) - 0xFFFFFFFF80000000)))
+    (*(uint32_t*)(rdram + (_tlb_lookup(offset + reg) - 0xFFFFFFFF80000000)))
 
 #define MEM_HU(offset, reg) \
-    (*(uint16_t*)(rdram + ((_tlb_lookup(rdram, offset + reg) ^ 2) - 0xFFFFFFFF80000000)))
+    (*(uint16_t*)(rdram + ((_tlb_lookup(offset + reg) ^ 2) - 0xFFFFFFFF80000000)))
 
 #define MEM_BU(offset, reg) \
-    (*(uint8_t*)(rdram + ((_tlb_lookup(rdram, offset + reg) ^ 3) - 0xFFFFFFFF80000000)))
+    (*(uint8_t*)(rdram + ((_tlb_lookup(offset + reg) ^ 3) - 0xFFFFFFFF80000000)))
 
 #define SD(val, offset, reg) { \
-    uint64_t _sd_phys = _tlb_lookup(rdram, offset + reg); \
+    uint64_t _sd_phys = _tlb_lookup(offset + reg); \
     *(uint32_t*)(rdram + ((_sd_phys + 4) - 0xFFFFFFFF80000000)) = (uint32_t)((gpr)(val) >> 0); \
     *(uint32_t*)(rdram + ((_sd_phys + 0) - 0xFFFFFFFF80000000)) = (uint32_t)((gpr)(val) >> 32); \
 }
@@ -523,9 +469,9 @@ typedef void (recomp_func_ext_t)(uint8_t* rdram, recomp_context* ctx, uintptr_t 
 
 recomp_func_t* get_function(int32_t vram);
 
-// Translate the TLB values. Pass a 0 for offset
+// Translate the TLB values.
 #define LOOKUP_FUNC(val)         \
-    get_function((int32_t)(_tlb_lookup(rdram, 0 + val)))
+    get_function((int32_t)(val))
 
 extern int32_t* section_addresses;
 

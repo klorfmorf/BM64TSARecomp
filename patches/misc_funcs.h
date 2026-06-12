@@ -4,11 +4,11 @@
 #include "patch_helpers.h"
 
 DECLARE_FUNC(void, recomp_load_overlays, u32 rom, void* ram, u32 size);
-DECLARE_FUNC(u32, recomp_overlay_slot_allocate, u32 virtual_addr, s32 file_id);
 DECLARE_FUNC(void, recomp_puts, const char* data, u32 size);
 DECLARE_FUNC(void, recomp_exit);
 DECLARE_FUNC(void, recomp_error, const char* str);
 DECLARE_FUNC(u64, recomp_xxh3, void* data, u32 size);
 DECLARE_FUNC(s32, recomp_get_note_saving_enabled);
+DECLARE_FUNC(u32, recomp_get_tlb_lookup, u32 addr);
 
 #endif

@@ -6,7 +6,7 @@
 
 struct TLBEntry gTLBTable[TLB_ENTRY_COUNT] = {0};
 
-//#define TLB_DEBUG
+#define TLB_DEBUG
 
 extern "C" void osMapTLB_recomp(uint8_t* rdram, recomp_context* ctx) {
     s32 index = _arg<0, s32>(rdram, ctx);

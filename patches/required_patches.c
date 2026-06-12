@@ -258,7 +258,7 @@ RECOMP_PATCH u32 fexecLoadAddress(s32 id, u32 (*func)()) {
 
     funcBackup = func;
     recomp_printf("[fexecLoadAddress] func pre-TLB lookup: 0x%08X\n", (u32)func);
-    func = (u32 (*)())(u32)recomp_overlay_slot_allocate((u32)funcBackup, fileID);
+    //func = (u32 (*)())recomp_get_tlb_lookup((u32)funcBackup);
     recomp_printf("[fexecLoadAddress] func after-TLB lookup: 0x%08X\n", (u32)func);
 
     // TODO: Rest of overlays
@@ -313,7 +313,7 @@ RECOMP_PATCH u32 fexecLoadAddress(s32 id, u32 (*func)()) {
 
     decode(stream, (u8*)func, i);
 
-    overlay_apply_relocations(fileID, (u8*)func);
+    //overlay_apply_relocations(fileID, (u8*)func);
 
     osWritebackDCache((void*)(((u32) ((u32)func + 0xF) >> 4) * 0x10), 0x80000);
     fclose_game(stream);
@@ -409,10 +409,14 @@ extern u32 zerojump_ROM_END;
 extern u32 D_8008E640[];
 extern u32 D_80097910[];
 
+extern void exec_zerojump_func();
+
 RECOMP_PATCH void zerojumpinit(void) {
-    dmaRead((void*)0x801D0000, (u32)&zerojump_ROM_END - (u32)&zerojump_ROM_START, (u32)&zerojump_ROM_START);
-    recomp_load_overlays(0x00098510, (void*)0x10000000, 0x130); // load zerojmp manually to RAM with a hack.
+    dmaRead((void*)exec_zerojump_func, (u32)&zerojump_ROM_END - (u32)&zerojump_ROM_START, (u32)&zerojump_ROM_START);
+    osMapTLB(0, 0, (void*)0x10000000, (u32) ((((u32)&exec_zerojump_func)) - 0x80000000), -1, -1);
     D_80097910[0] = (u32)&D_8008E640; // map the secure call manually.
+
+    recomp_load_overlays(0x98510, (void*)0x10000000, 0x130); // hack
 }
 
 #if 0
