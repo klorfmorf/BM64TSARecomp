@@ -4,7 +4,9 @@
 #include "ultramodern/ultramodern.hpp"
 #include "tlb.h"
 
+extern "C" {
 struct TLBEntry gTLBTable[TLB_ENTRY_COUNT];
+}
 
 #define TLB_DEBUG
 

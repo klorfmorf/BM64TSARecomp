@@ -1,8 +1,9 @@
 #ifndef __TLB_H__
 #define __TLB_H__
 
-#include <stdint.h>
-#include <stdio.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define OS_PM_4K	0x0000000
 #define OS_PM_16K	0x0006000
@@ -82,5 +83,9 @@ static inline int64_t _tlb_lookup(int64_t eff_addr) {
     printf("[_tlb_lookup] WARNING: Lookup failed. Defaulting to original address 0x%jX. Recomp may crash!\n", eff_addr);
     return eff_addr; // same here.
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __TLB_H__
