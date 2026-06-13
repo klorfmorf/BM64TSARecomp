@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Bomberman 64 The Second Attack: Recompiled
+Exec=/app/bin/BM64TSARecompiled
+Type=Application
+Icon=io.github.bm64tsarecomp.bm64tsarecomp
+Categories=Game;
+Comment=Static recompilation of Bomberman 64: The Second Attack for PC.
+MimeType=x-scheme-handler/bm64tsarecomp
