@@ -1,6 +1,9 @@
 #ifndef __TLB_H__
 #define __TLB_H__
 
+#include <stdint.h>
+#include <stdio.h>
+
 #define OS_PM_4K	0x0000000
 #define OS_PM_16K	0x0006000
 #define OS_PM_64K	0x001E000
