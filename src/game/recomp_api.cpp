@@ -254,10 +254,6 @@ extern "C" void __osContRamWrite_recomp(RDRAM_ARG recomp_context * ctx) {
     // TODO
 }
 
-extern "C" void longjmp_recomp(RDRAM_ARG recomp_context * ctx) {
-    // TODO
-}
-
 extern "C" void osPiReadIo_recomp(RDRAM_ARG recomp_context * ctx) {
     uint32_t devAddr = recomp::rom_base | ctx->r4;
     gpr dramAddr = ctx->r5;
