@@ -1,5 +1,5 @@
-#ifndef TLB_H
-#define TLB_H
+#ifndef __TLB_H__
+#define __TLB_H__
 
 #define OS_PM_4K	0x0000000
 #define OS_PM_16K	0x0006000
@@ -80,4 +80,4 @@ static inline int64_t _tlb_lookup(int64_t eff_addr) {
     return eff_addr; // same here.
 }
 
-#endif // TLB_H
+#endif // __TLB_H__
