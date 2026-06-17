@@ -2342,7 +2342,7 @@ static const u32 s_relocs_ovl_item_main[] = {
 
 /* .ovl_coll_main: VMA 0x44000000, 51 relocations */
 static const u32 s_relocs_ovl_coll_main[] = {
-    0x000063F8,
+    /* 0x000063F8, */ /* False relocation, ignore */
     0x00006460,
     0x00006464,
     0x00006468,
@@ -9069,7 +9069,7 @@ static const u32 s_relocs_ovl_stage_world8[] = {
 static const RelocInfo g_relocs[RELOC_TABLE_SIZE] = {
     [0x0A] = { s_relocs_ovl_actor_main, 2179, RELOC_SECTION_40000000 },
     [0x0B] = { s_relocs_ovl_item_main, 123, RELOC_SECTION_41000000 },
-    [0x0E] = { s_relocs_ovl_coll_main, 51, RELOC_SECTION_44000000 },
+    [0x0E] = { s_relocs_ovl_coll_main, 50 /* 51 */, RELOC_SECTION_44000000 },
     [0x0F] = { s_relocs_ovl_mobj_main, 1595, RELOC_SECTION_45000000 },
     [0x40] = { s_relocs_ovl_blast_flame, 41, RELOC_SECTION_42000000 },
     [0x41] = { s_relocs_ovl_blast_ice, 41, RELOC_SECTION_42000000 },

@@ -112,28 +112,33 @@ if(NOT DEFINED PATCHES_LD)
     set(PATCHES_LD ld.lld)
 endif()
 
+set(PATCHES_DIR ${CMAKE_SOURCE_DIR}/patches)
+set(PATCHES_BUILD_DIR ${PATCHES_DIR}/build)
+set(PATCHES_ELF ${PATCHES_BUILD_DIR}/patches.elf)
+set(PATCHES_BIN ${PATCHES_BUILD_DIR}/patches.bin)
+
 add_custom_target(PatchesBin
     COMMAND ${CMAKE_COMMAND} -E env CC=${PATCHES_C_COMPILER} LD=${PATCHES_LD} make
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/patches
-    BYPRODUCTS ${CMAKE_SOURCE_DIR}/patches/patches.elf
+    WORKING_DIRECTORY ${PATCHES_DIR}
+    BYPRODUCTS ${PATCHES_ELF} ${PATCHES_BUILD_DIR}/patches.map
 )
 
 # Generate patches_bin.c from patches.bin
 add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/RecompiledPatches/patches_bin.c
-    COMMAND file_to_c ${CMAKE_SOURCE_DIR}/patches/patches.bin bk_patches_bin ${CMAKE_SOURCE_DIR}/RecompiledPatches/patches_bin.c ${CMAKE_SOURCE_DIR}/RecompiledPatches/patches_bin.h
-    DEPENDS ${CMAKE_SOURCE_DIR}/patches/patches.bin
+    COMMAND file_to_c ${PATCHES_BIN} bk_patches_bin ${CMAKE_SOURCE_DIR}/RecompiledPatches/patches_bin.c ${CMAKE_SOURCE_DIR}/RecompiledPatches/patches_bin.h
+    DEPENDS ${PATCHES_BIN}
 )
 
 # Recompile patches elf into patches.c and patches.bin
 add_custom_command(OUTPUT
-                       ${CMAKE_SOURCE_DIR}/patches/patches.bin
+                       ${PATCHES_BIN}
                        ${CMAKE_SOURCE_DIR}/RecompiledPatches/patches.c
                        ${CMAKE_SOURCE_DIR}/RecompiledPatches/recomp_overlays.inl
                        ${CMAKE_SOURCE_DIR}/RecompiledPatches/funcs.h
                    # TODO: Look into why modifying patches requires two builds to take
                    COMMAND ./N64Recomp patches.toml
                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                   DEPENDS ${CMAKE_SOURCE_DIR}/patches/patches.elf
+                   DEPENDS ${PATCHES_ELF}
 )
 
 # Main executable
@@ -147,13 +152,12 @@ set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/main/theme.cpp
 
     ${CMAKE_SOURCE_DIR}/src/game/config.cpp
-    ${CMAKE_SOURCE_DIR}/src/game/debug.cpp
     ${CMAKE_SOURCE_DIR}/src/game/recomp_api.cpp
     ${CMAKE_SOURCE_DIR}/src/game/recomp_extension_api.cpp
     ${CMAKE_SOURCE_DIR}/src/game/recomp_data_api.cpp
     ${CMAKE_SOURCE_DIR}/src/game/rom_decompression.cpp
     ${CMAKE_SOURCE_DIR}/src/game/minicoro.cpp
-    ${CMAKE_SOURCE_DIR}/src/game/process_coroutines.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/process_api.cpp
     ${CMAKE_SOURCE_DIR}/src/game/tlb.cpp
 
     ${CMAKE_SOURCE_DIR}/rsp/n_aspMain.cpp

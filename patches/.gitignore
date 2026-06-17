@@ -1,3 +1,7 @@
-*.d
-*.bin
-*.elf
+/build/
+
+/*.d
+/*.o
+/*.bin
+/*.elf
+/*.map

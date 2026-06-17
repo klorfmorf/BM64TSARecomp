@@ -6,9 +6,6 @@
 #include <math.h>
 #include <fenv.h>
 #include <assert.h>
-#include <stdio.h>
-
-#include "tlb.h"
 
 // Compiler definition to disable inter-procedural optimization, allowing multiple functions to be in a single file without breaking interposition.
 #if defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
@@ -86,17 +83,6 @@ static inline void DDIVU(uint64_t a, uint64_t b, uint64_t* quot, uint64_t* rem) 
 
 typedef uint64_t gpr;
 
-/**
- * TLB Lookup addresses for Bomberman 64: The Second Attack
- */
-#define RELOC_SECTION_60000000 0x60000000
-#define RELOC_SECTION_40000000 0x40000000
-#define RELOC_SECTION_41000000 0x41000000
-#define RELOC_SECTION_42000000 0x42000000
-#define RELOC_SECTION_43000000 0x43000000
-#define RELOC_SECTION_44000000 0x44000000
-#define RELOC_SECTION_45000000 0x45000000
-
 #define SIGNED(val) \
     ((int64_t)(val))
 
@@ -106,32 +92,27 @@ typedef uint64_t gpr;
 #define SUB32(a, b) \
     ((gpr)(int32_t)((a) - (b)))
 
-// MEM_* macros: _tlb_lookup now returns the fully-resolved sign-extended KSEG0
-// physical address (effective address with TLB translation already applied and
-// the offset already folded in), so we no longer add `+ (offset)` after the call.
-
 #define MEM_W(offset, reg) \
-    (*(int32_t*)(rdram + (_tlb_lookup(offset + reg) - 0xFFFFFFFF80000000)))
+    (*(int32_t*)(rdram + ((((reg) + (offset))) - 0xFFFFFFFF80000000)))
 
 #define MEM_H(offset, reg) \
-    (*(int16_t*)(rdram + ((_tlb_lookup(offset + reg) ^ 2) - 0xFFFFFFFF80000000)))
+    (*(int16_t*)(rdram + ((((reg) + (offset)) ^ 2) - 0xFFFFFFFF80000000)))
 
 #define MEM_B(offset, reg) \
-    (*(int8_t*)(rdram + ((_tlb_lookup(offset + reg) ^ 3) - 0xFFFFFFFF80000000)))
-
+    (*(int8_t*)(rdram + ((((reg) + (offset)) ^ 3) - 0xFFFFFFFF80000000)))
+    
 #define MEM_WU(offset, reg) \
-    (*(uint32_t*)(rdram + (_tlb_lookup(offset + reg) - 0xFFFFFFFF80000000)))
+    (*(uint32_t*)(rdram + ((((reg) + (offset))) - 0xFFFFFFFF80000000)))
 
 #define MEM_HU(offset, reg) \
-    (*(uint16_t*)(rdram + ((_tlb_lookup(offset + reg) ^ 2) - 0xFFFFFFFF80000000)))
+    (*(uint16_t*)(rdram + ((((reg) + (offset)) ^ 2) - 0xFFFFFFFF80000000)))
 
 #define MEM_BU(offset, reg) \
-    (*(uint8_t*)(rdram + ((_tlb_lookup(offset + reg) ^ 3) - 0xFFFFFFFF80000000)))
+    (*(uint8_t*)(rdram + ((((reg) + (offset)) ^ 3) - 0xFFFFFFFF80000000)))
 
 #define SD(val, offset, reg) { \
-    uint64_t _sd_phys = _tlb_lookup(offset + reg); \
-    *(uint32_t*)(rdram + ((_sd_phys + 4) - 0xFFFFFFFF80000000)) = (uint32_t)((gpr)(val) >> 0); \
-    *(uint32_t*)(rdram + ((_sd_phys + 0) - 0xFFFFFFFF80000000)) = (uint32_t)((gpr)(val) >> 32); \
+    *(uint32_t*)(rdram + ((((reg) + (offset) + 4)) - 0xFFFFFFFF80000000)) = (uint32_t)((gpr)(val) >> 0); \
+    *(uint32_t*)(rdram + ((((reg) + (offset) + 0)) - 0xFFFFFFFF80000000)) = (uint32_t)((gpr)(val) >> 32); \
 }
 
 static inline uint64_t load_doubleword(uint8_t* rdram, gpr reg, gpr offset) {
@@ -469,8 +450,7 @@ typedef void (recomp_func_ext_t)(uint8_t* rdram, recomp_context* ctx, uintptr_t 
 
 recomp_func_t* get_function(int32_t vram);
 
-// Translate the TLB values.
-#define LOOKUP_FUNC(val)         \
+#define LOOKUP_FUNC(val) \
     get_function((int32_t)(val))
 
 extern int32_t* section_addresses;

@@ -7,6 +7,7 @@ rom_file_path = "bm64tsa.decomp.us.z64"
 bss_section_suffix = "_bss"
 symbols_file_path = "BM64TSASyms/dump.toml"
 output_func_path = "RecompiledFuncs"
+relocatable_sections_path = "bm64tsa.us.overlays.txt"
 recomp_include = "#include \"bm64tsa_recomp.h\""
 trace_mode = false
 

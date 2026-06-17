@@ -24,7 +24,5 @@ void overlay_apply_relocations(u32 file_id, u8 *load_addr) {
         u32 value = *value_addr;
 
         *value_addr = value + (u32)delta;
-
-        recomp_printf("[overlay_apply_relocations] 0x%08X -> 0x%08X\n", value, *value_addr);
     }
 }
